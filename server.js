@@ -12,7 +12,7 @@ const upload = multer({
 
 // ── CORS ───────────────────────────────────────────────────────
 const allowedOrigins = [
-  'https://olanle.github.io',   // ← removed the path and trailing slash
+  'https://olanle.github.io',   
   'http://localhost:3000',
   'http://127.0.0.1:5500',
   'http://127.0.0.1:3000',
