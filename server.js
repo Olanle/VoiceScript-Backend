@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express  = require('express');
-const cors     = require('cors');
 const multer   = require('multer');
 const fetch    = require('node-fetch');
 const FormData = require('form-data');
@@ -19,17 +18,20 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
 ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // allow requests with no origin (e.g. curl, Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS blocked: ${origin} is not allowed`));
-  },
-  methods: ['GET', 'POST'],
-}));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-app.use(express.json());
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 
 // ── Health Check ───────────────────────────────────────────────
 app.get('/health', (req, res) => {
