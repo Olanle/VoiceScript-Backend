@@ -7,14 +7,14 @@ const FormData = require('form-data');
 const app    = express();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 } // 25MB max
+  limits: { fileSize: 25 * 1024 * 1024 }
 });
 
 // ── CORS ───────────────────────────────────────────────────────
 const allowedOrigins = [
-  'https://olanle.github.io/VoiceScript-Frontend/',   
+  'https://olanle.github.io',   // ← removed the path and trailing slash
   'http://localhost:3000',
-  'http://127.0.0.1:5500',       
+  'http://127.0.0.1:5500',
   'http://127.0.0.1:3000',
 ];
 
@@ -33,13 +33,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Body Parsers ── must be before routes ──────────────────────
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // ── Health Check ───────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ── POST /transcribe ───────────────────────────────────────────
-// Receives audio file, sends to Groq Whisper, returns raw transcript
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No audio file received.' });
@@ -80,7 +83,6 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
 });
 
 // ── POST /format ───────────────────────────────────────────────
-// Receives raw transcript text, sends to Groq LLM, returns formatted transcript
 app.post('/format', async (req, res) => {
   const { transcript, model } = req.body;
 
