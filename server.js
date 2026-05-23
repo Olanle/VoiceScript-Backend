@@ -10,7 +10,7 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 }
 });
 
-// ── CORS ───────────────────────────────────────────────────────
+// CORS
 const allowedOrigins = [
   'https://olanle.github.io',
   'http://localhost:3000',
@@ -33,11 +33,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Body Parsers ───────────────────────────────────────────────
+// Body Parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── System Prompt ──────────────────────────────────────────────
+// System Prompt
 const systemPrompt = `You are a professional transcript formatter.
 Your task is to take a raw speech-to-text transcript and format it into clean, readable, well-structured text.
 
@@ -48,12 +48,12 @@ Rules:
 4. Correct obvious filler-word placement but keep intentional repetitions.
 5. Output ONLY the formatted transcript — no commentary, no preamble, no "Here is..." intro.`;
 
-// ── Health Check ───────────────────────────────────────────────
+// Health Check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ── POST /transcribe ───────────────────────────────────────────
+// POST /transcribe
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No audio file received.' });
@@ -93,7 +93,7 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
   }
 });
 
-// ── POST /format ───────────────────────────────────────────────
+// POST /format
 app.post('/format', async (req, res) => {
   const { transcript, model } = req.body;
 
@@ -107,7 +107,7 @@ app.post('/format', async (req, res) => {
     let formatted;
 
     if (isGemini) {
-      // ── Gemini API ───────────────────────────────────────────
+      // Gemini API
       const geminiModel = model || 'models/gemini-2.5-flash';
 
       const geminiRes = await fetch(
@@ -144,7 +144,7 @@ app.post('/format', async (req, res) => {
       formatted = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || transcript;
 
     } else {
-      // ── Groq API ─────────────────────────────────────────────
+      // Groq API 
       const groqModel = model || 'llama-3.3-70b-versatile';
 
       const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -183,7 +183,7 @@ app.post('/format', async (req, res) => {
   }
 });
 
-// ── Start ──────────────────────────────────────────────────────
+// Start
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`VoiceScript backend running on port ${PORT}`);
