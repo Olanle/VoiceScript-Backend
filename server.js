@@ -7,14 +7,14 @@ const FormData = require('form-data');
 const app    = express();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB max
 });
 
 // ── CORS ───────────────────────────────────────────────────────
 const allowedOrigins = [
-  'https://olanle.github.io',   
+  'https://olanle.github.io/VoiceScript-Frontend/',   
   'http://localhost:3000',
-  'http://127.0.0.1:5500',
+  'http://127.0.0.1:5500',       
   'http://127.0.0.1:3000',
 ];
 
@@ -26,6 +26,7 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
+  // Handle preflight requests immediately
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
@@ -33,16 +34,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Body Parsers ── must be before routes ──────────────────────
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 // ── Health Check ───────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ── POST /transcribe ───────────────────────────────────────────
+// Receives audio file, sends to Groq Whisper, returns raw transcript
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No audio file received.' });
@@ -83,12 +81,15 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
 });
 
 // ── POST /format ───────────────────────────────────────────────
+// Receives raw transcript text, sends to Groq LLM, returns formatted transcript
 app.post('/format', async (req, res) => {
   const { transcript, model } = req.body;
 
   if (!transcript) {
     return res.status(400).json({ error: 'No transcript text received.' });
   }
+
+  const groqModel = model || 'mixtral-8x7b-32768';
 
   const systemPrompt = `You are a professional transcript formatter.
 Your task is to take a raw speech-to-text transcript and format it into clean, readable, well-structured text.
@@ -101,39 +102,32 @@ Rules:
 5. Output ONLY the formatted transcript — no commentary, no preamble, no "Here is..." intro.`;
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: systemPrompt }]
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `Format this transcript:\n\n${transcript}` }]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 8192,
-          }
-        }),
-      }
-    );
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: groqModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: `Format this transcript:\n\n${transcript}` }
+        ],
+        temperature: 0.3,
+        max_tokens: 4096,
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.json().catch(() => ({}));
-      return res.status(geminiRes.status).json({
-        error: err?.error?.message || 'Gemini API error.'
+    if (!groqRes.ok) {
+      const err = await groqRes.json().catch(() => ({}));
+      return res.status(groqRes.status).json({
+        error: err?.error?.message || 'Groq LLM API error.'
       });
     }
 
-    const data = await geminiRes.json();
-    const formatted = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || transcript;
-    res.json({ formatted });
+    const data = await groqRes.json();
+    res.json({ formatted: data.choices?.[0]?.message?.content?.trim() || transcript });
 
   } catch (err) {
     console.error('Format error:', err);
