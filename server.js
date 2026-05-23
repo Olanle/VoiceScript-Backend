@@ -7,14 +7,14 @@ const FormData = require('form-data');
 const app    = express();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 } // 25MB max
+  limits: { fileSize: 25 * 1024 * 1024 }
 });
 
 // ── CORS ───────────────────────────────────────────────────────
 const allowedOrigins = [
-  'https://olanle.github.io/VoiceScript-Frontend/',   
+  'https://olanle.github.io',   
   'http://localhost:3000',
-  'http://127.0.0.1:5500',       
+  'http://127.0.0.1:5500',
   'http://127.0.0.1:3000',
 ];
 
@@ -26,7 +26,6 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // Handle preflight requests immediately
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
@@ -34,13 +33,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Body Parsers ── must be before routes ──────────────────────
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // ── Health Check ───────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ── POST /transcribe ───────────────────────────────────────────
-// Receives audio file, sends to Groq Whisper, returns raw transcript
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No audio file received.' });
@@ -81,7 +83,6 @@ app.post('/transcribe', upload.single('audio'), async (req, res) => {
 });
 
 // ── POST /format ───────────────────────────────────────────────
-// Receives raw transcript text, sends to Groq LLM, returns formatted transcript
 app.post('/format', async (req, res) => {
   const { transcript, model } = req.body;
 
@@ -89,7 +90,7 @@ app.post('/format', async (req, res) => {
     return res.status(400).json({ error: 'No transcript text received.' });
   }
 
-  const groqModel = model || 'mixtral-8x7b-32768';
+  const groqModel = model || 'llama-3.3-70b-versatile';
 
   const systemPrompt = `You are a professional transcript formatter.
 Your task is to take a raw speech-to-text transcript and format it into clean, readable, well-structured text.
